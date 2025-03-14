@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  role          UserRole  @default(STAFF)
+  staff         Staff?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+model Ward {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  level       Int
+  rooms       Room[]
+  staff       Staff[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("wards")
+}
+
+model Room {
+  id              String    @id @default(cuid())
+  roomNumber      String    @unique
+  maxOccupants    Int
+  wardId          String
+  ward            Ward      @relation(fields: [wardId], references: [id])
+  patients        Patient[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("rooms")
+}
+
+model Staff {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+  staffNumber   String    @unique
+  firstName     String
+  lastName      String
+  niNumber      String    @unique
+  dateOfBirth   DateTime
+  address       String
+  jobType       JobType
+  wardId        String
+  ward          Ward      @relation(fields: [wardId], references: [id])
+  joinDate      DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("staff")
+}
+
+enum JobType {
+  HEAD_NURSE
+  NURSE
+  DOCTOR
+  OFFICE_STAFF
+  ROOM_ATTENDANT
+}
+
+model Patient {
+  id            String          @id @default(cuid())
+  patientNumber String          @unique
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime
+  address       String
+  telephone     String
+  email         String?
+  illness       String
+  admissionDate DateTime
+  leavingDate   DateTime?
+  roomId        String
+  room          Room            @relation(fields: [roomId], references: [id])
+  nextOfKin     NextOfKin[]
+  examinations  Examination[]
+  prescriptions Prescription[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@map("patients")
+}
+
+model NextOfKin {
+  id          String    @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String
+  telephone   String
+  address     String
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("next_of_kin")
+}
+
+model Examination {
+  id            String    @id @default(cuid())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  temperature   Float
+  bloodPressure String
+  pulse         Int
+  examDate      DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("examinations")
+}
+
+model Drug {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  name          String
+  description   String?
+  quantity      Int          @default(0)
+  prescriptions Prescription[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("drugs")
+}
+
+model Prescription {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id])
+  drugId          String
+  drug            Drug      @relation(fields: [drugId], references: [id])
+  prescriptionDate DateTime
+  treatmentLength Int       // in days
+  dosage          String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("prescriptions")
+}
+
+model Inventory {
+  id          String    @id @default(cuid())
+  itemName    String
+  quantity    Int
+  category    String
+  minQuantity Int      @default(10)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("inventory")
+}
