@@ -10,6 +10,7 @@ declare module "next-auth" {
 			id?: string;
 			role?: string;
 		} & DefaultSession["user"];
+		token?: string; // Add this line to include the token property
 	}
 
 	/**

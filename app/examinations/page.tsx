@@ -1,66 +1,69 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../api/auth/[...nextauth]/route'
-import prisma from '@/lib/prisma'
-import { redirect } from 'next/navigation'
-import ExaminationList from './components/ExaminationList'
-import ExaminationStats from './components/ExaminationStats'
-import ReportDialog from '@/components/ReportDialog'
-import { FaFileDownload } from 'react-icons/fa'
+import { getServerSession } from "next-auth";
+import { authOptions } from "../api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import ExaminationList from "./components/ExaminationList";
+import ExaminationStats from "./components/ExaminationStats";
+import InteractiveHeader from "@/components/InteractiveHeader";
 
-export default async function ExaminationsPage() {
-  const session = await getServerSession(authOptions)
-  
-  if (!session) {
-    redirect('/login')
-  }
+export default async function ExaminationsPage({
+	searchParams,
+}: {
+	searchParams: { page?: string; search?: string };
+}) {
+	const session = await getServerSession(authOptions);
 
-  const examinations = await prisma.examination.findMany({
-    include: {
-      patient: true
-    },
-    orderBy: {
-      examDate: 'desc'
-    }
-  })
+	if (!session) {
+		redirect("/login");
+	}
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+	// Fetch initial data from API
+	const page = Number(searchParams.page) || 1;
+	const search = searchParams.search || "";
 
-  const weekStart = new Date(today)
-  weekStart.setDate(today.getDate() - today.getDay())
+	const params = new URLSearchParams({
+		page: page.toString(),
+		search,
+	});
 
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+	const [examinationsRes, statsRes, patientsRes] = await Promise.all([
+		fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/examinations?${params}`, {
+			headers: {
+				Cookie: `next-auth.session-token=${session.token}`,
+			},
+		}),
+		fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/examinations/stats`, {
+			headers: {
+				Cookie: `next-auth.session-token=${session.token}`,
+			},
+		}),
+		fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients?active=true`, {
+			headers: {
+				Cookie: `next-auth.session-token=${session.token}`,
+			},
+		}),
+	]);
 
-  const stats = {
-    total: examinations.length,
-    today: examinations.filter(exam => new Date(exam.examDate) >= today).length,
-    thisWeek: examinations.filter(exam => new Date(exam.examDate) >= weekStart).length,
-    thisMonth: examinations.filter(exam => new Date(exam.examDate) >= monthStart).length
-  }
+	if (!examinationsRes.ok || !statsRes.ok || !patientsRes.ok) {
+		throw new Error("Failed to fetch data");
+	}
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Examination Records</h1>
-        <div className="flex space-x-4">
-          <button
-            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
-            onClick={() => {
-              // @ts-ignore - This is handled by the client component
-              window.showReportDialog?.('examinations', examinations)
-            }}
-          >
-            <FaFileDownload />
-            <span>Generate Report</span>
-          </button>
-          <button className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-            New Examination
-          </button>
-        </div>
-      </div>
+	const [examinations, stats, patients] = await Promise.all([
+		examinationsRes.json(),
+		statsRes.json(),
+		patientsRes.json(),
+	]);
 
-      <ExaminationStats stats={stats} />
-      <ExaminationList examinations={examinations} />
-    </div>
-  )
+	return (
+		<div className="space-y-6">
+			<InteractiveHeader
+				moduleTitle="Examinations"
+				onNewItem={() => {}}
+				onGenerateReport={() => {}}
+			/>
+
+			<ExaminationStats stats={stats} />
+
+			<ExaminationList initialData={examinations} patients={patients} />
+		</div>
+	);
 }
